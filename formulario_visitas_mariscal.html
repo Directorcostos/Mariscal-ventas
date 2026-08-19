@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visita de campo — Café Mariscal</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;padding:1rem}
+.wrap{max-width:480px;margin:0 auto}
+h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:4px}
+.sub{font-size:13px;color:#666;margin-bottom:1.5rem}
+.logo{font-size:13px;font-weight:600;color:#8B6200;margin-bottom:1rem}
+.section{background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
+.section-title{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem}
+label{display:block;font-size:13px;color:#555;margin-bottom:4px;margin-top:.75rem}
+label:first-of-type{margin-top:0}
+input,textarea{width:100%;font-size:16px;padding:10px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#1a1a1a;-webkit-appearance:none}
+input:focus,textarea:focus{outline:none;border-color:#1a6ec4}
+textarea{resize:vertical;min-height:80px;font-family:inherit;line-height:1.5}
+.ref-row{display:grid;grid-template-columns:1fr 88px;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #f0f0f0}
+.ref-row:last-child{border-bottom:none}
+.ref-name{font-size:12px;color:#1a1a1a;line-height:1.4}
+.ref-input{font-size:16px;padding:8px;border:1px solid #ddd;border-radius:8px;text-align:center;width:100%;-webkit-appearance:none}
+.ref-input:focus{outline:none;border-color:#1a6ec4}
+.gps-btn{width:100%;padding:11px;border:1px solid #ccc;border-radius:8px;background:#f8f8f8;color:#1a1a1a;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent}
+.gps-btn:active{background:#eee}
+.gps-status{font-size:12px;color:#666;margin-top:6px;min-height:16px;text-align:center}
+.gps-ok{color:#2d7a2d}
+.gps-err{color:#c0392b}
+.submit-btn{width:100%;padding:15px;border:none;border-radius:8px;background:#1a6ec4;color:#fff;font-size:17px;font-weight:600;cursor:pointer;margin-top:.5rem;-webkit-tap-highlight-color:transparent}
+.submit-btn:active{background:#155fa0}
+.submit-btn:disabled{opacity:.5;cursor:not-allowed}
+.err{font-size:12px;color:#c0392b;margin-top:4px;display:none}
+.success-msg{background:#eafaf1;border:1px solid #a9dfbf;border-radius:12px;padding:2rem 1.5rem;text-align:center;display:none}
+.success-icon{font-size:48px;margin-bottom:.5rem}
+.success-msg h3{font-size:18px;color:#1e8449;font-weight:600;margin-bottom:.5rem}
+.success-msg p{font-size:14px;color:#555}
+.new-btn{margin-top:1.5rem;width:100%;padding:13px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;font-size:15px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="logo">☕ Café Mariscal</p>
+  <h2>Visita de campo</h2>
+  <p class="sub">Registro de inventario en punto de venta</p>
+
+  <div id="form-body">
+
+    <div class="section">
+      <div class="section-title">Vendedor</div>
+      <label for="vendedor">Nombre</label>
+      <input type="text" id="vendedor" placeholder="Escribe tu nombre" autocomplete="name">
+      <div class="err" id="err-vendedor">Ingresa el nombre del vendedor</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Datos del cliente</div>
+      <label for="cliente">Nombre del cliente</label>
+      <input type="text" id="cliente" placeholder="Ej: Tienda El Progreso">
+      <div class="err" id="err-cliente">Ingresa el nombre del cliente</div>
+
+      <label for="punto">Punto de venta</label>
+      <input type="text" id="punto" placeholder="Ej: Sede Centro, Local 12">
+      <div class="err" id="err-punto">Ingresa el punto de venta</div>
+
+      <label for="fecha">Fecha</label>
+      <input type="date" id="fecha">
+
+      <label for="hora">Hora</label>
+      <input type="time" id="hora">
+    </div>
+
+    <div class="section">
+      <div class="section-title">Ubicación GPS</div>
+      <button class="gps-btn" id="gps-btn" onclick="captureGPS()">
+        📍 Capturar ubicación
+      </button>
+      <p class="gps-status" id="gps-status"></p>
+      <input type="hidden" id="lat">
+      <input type="hidden" id="lng">
+    </div>
+
+    <div class="section">
+      <div class="section-title">Inventario encontrado (unidades)</div>
+      <div id="refs-list"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Observación</div>
+      <textarea id="observacion" placeholder="Escribe aquí cualquier observación relevante de la visita..."></textarea>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" onclick="enviar()">
+      Enviar registro
+    </button>
+
+  </div>
+
+  <div class="success-msg" id="success-msg">
+    <div class="success-icon">✅</div>
+    <h3>Registro enviado</h3>
+    <p id="success-detail"></p>
+    <button class="new-btn" onclick="resetForm()">Registrar otra visita</button>
+  </div>
+
+</div>
+
+<script>
+const REFS = [
+  "250gr TRADICIONAL","2500g TRADICIONAL","1K MARISCAL TRADICIONAL",
+  "400g TRADICIONAL","500g TRADICIONAL","1/4 TRADICIONAL",
+  "CAFE MARISCAL INSTITUCIONAL 2500g","CAFE MARISCAL MOLIDO TRAD 50GRMS",
+  "500g EXC/MOL INTENSO","500g EXC/MOL BALANCEADO","500g EXC/GRANO",
+  "CAFE MARISCAL GOLD SELECTION 250GR",
+  "50G INST FRAS/POLVO MARISCAL","85G INST FRAS/POLVO MARISCAL","170G INST FRASCO/POLVO MARISCAL",
+  "50g INST FRAS/GRAN MARISCAL","85g INST FRAS/GRAN MARISCAL","170g INST FRAS/GRAN MARISCAL",
+  "CAFE MARISCAL INST LIOFILIZADO 85 GRMS","CAFE MARISCAL INST LIOFILIZADO 170GR",
+  "CAFE MARISCAL GRAN EDICION ESPECIAL 100 GRMS",
+  "20G INST SACH POL MAR","500g INST/POLVO MARISCAL","500g INST/GRAN MARISCAL"
+];
+
+const GS_URL = 'https://script.google.com/a/macros/unal.edu.co/s/AKfycbxZB17lnAQ6WYmhv3fltUm3ng7zseFm-3WfxK8j6Eu1YL7YbNEuduw28_pFtD6cMtPG/exec';
+
+const list = document.getElementById('refs-list');
+REFS.forEach((ref, i) => {
+  const row = document.createElement('div');
+  row.className = 'ref-row';
+  row.innerHTML = '<span class="ref-name">' + ref + '</span><input type="number" class="ref-input" id="ref-' + i + '" min="0" placeholder="0" inputmode="numeric">';
+  list.appendChild(row);
+});
+
+const now = new Date();
+document.getElementById('fecha').value = now.toISOString().split('T')[0];
+document.getElementById('hora').value = now.toTimeString().slice(0,5);
+
+function captureGPS() {
+  const btn = document.getElementById('gps-btn');
+  const status = document.getElementById('gps-status');
+  btn.disabled = true;
+  status.className = 'gps-status';
+  status.textContent = 'Obteniendo ubicación...';
+  if (!navigator.geolocation) {
+    status.className = 'gps-status gps-err';
+    status.textContent = 'GPS no disponible en este dispositivo';
+    btn.disabled = false;
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      var lat = pos.coords.latitude.toFixed(6);
+      var lng = pos.coords.longitude.toFixed(6);
+      document.getElementById('lat').value = lat;
+      document.getElementById('lng').value = lng;
+      status.className = 'gps-status gps-ok';
+      status.textContent = '✓ Lat: ' + lat + ', Lng: ' + lng;
+      btn.textContent = '✅ Ubicación capturada';
+      btn.disabled = false;
+    },
+    function() {
+      status.className = 'gps-status gps-err';
+      status.textContent = 'No se pudo obtener la ubicación. Intenta de nuevo.';
+      btn.disabled = false;
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+function showErr(id, show) {
+  document.getElementById('err-' + id).style.display = show ? 'block' : 'none';
+}
+
+function enviar() {
+  var valid = true;
+  var vendedor = document.getElementById('vendedor').value.trim();
+  var cliente = document.getElementById('cliente').value.trim();
+  var punto = document.getElementById('punto').value.trim();
+  if (!vendedor) { showErr('vendedor', true); valid = false; } else showErr('vendedor', false);
+  if (!cliente) { showErr('cliente', true); valid = false; } else showErr('cliente', false);
+  if (!punto) { showErr('punto', true); valid = false; } else showErr('punto', false);
+  if (!valid) return;
+
+  var fecha = document.getElementById('fecha').value;
+  var hora = document.getElementById('hora').value;
+  var lat = document.getElementById('lat').value;
+  var lng = document.getElementById('lng').value;
+  var obs = document.getElementById('observacion').value.trim();
+
+  var refsCount = 0;
+  REFS.forEach(function(_, i) {
+    if ((parseInt(document.getElementById('ref-' + i).value) || 0) > 0) refsCount++;
+  });
+
+  var btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+
+  var row = [
+    new Date().toISOString(),
+    vendedor, cliente, punto, fecha, hora,
+    lat || 'Sin GPS', lng || 'Sin GPS'
+  ];
+  REFS.forEach(function(_, i) {
+    row.push(document.getElementById('ref-' + i).value || '0');
+  });
+  row.push(obs);
+
+  fetch(GS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ row: row })
+  }).then(function() {
+    showSuccess(vendedor, cliente, punto, refsCount);
+  }).catch(function() {
+    btn.disabled = false;
+    btn.textContent = 'Enviar registro';
+    alert('Error de conexión. Verifica tu internet e intenta de nuevo.');
+  });
+}
+
+function showSuccess(vendedor, cliente, punto, refs) {
+  document.getElementById('form-body').style.display = 'none';
+  var msg = document.getElementById('success-msg');
+  msg.style.display = 'block';
+  document.getElementById('success-detail').textContent =
+    vendedor + ' · ' + cliente + ' · ' + punto + ' · ' + refs + ' referencia' + (refs !== 1 ? 's' : '') + ' con inventario';
+}
+
+function resetForm() {
+  document.getElementById('form-body').style.display = 'block';
+  document.getElementById('success-msg').style.display = 'none';
+  document.getElementById('vendedor').value = '';
+  document.getElementById('cliente').value = '';
+  document.getElementById('punto').value = '';
+  document.getElementById('observacion').value = '';
+  document.getElementById('gps-status').textContent = '';
+  document.getElementById('gps-btn').textContent = '📍 Capturar ubicación';
+  document.getElementById('gps-btn').disabled = false;
+  document.getElementById('lat').value = '';
+  document.getElementById('lng').value = '';
+  REFS.forEach(function(_, i) { document.getElementById('ref-' + i).value = ''; });
+  var now = new Date();
+  document.getElementById('fecha').value = now.toISOString().split('T')[0];
+  document.getElementById('hora').value = now.toTimeString().slice(0,5);
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('submit-btn').textContent = 'Enviar registro';
+}
+</script>
+</body>
+</html>
