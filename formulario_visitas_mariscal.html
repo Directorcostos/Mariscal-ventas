@@ -120,23 +120,23 @@ const REFS = [
   "20G INST SACH POL MAR","500g INST/POLVO MARISCAL","500g INST/GRAN MARISCAL"
 ];
 
-const GS_URL = 'https://script.google.com/macros/s/AKfycbyMdnNRPR3_j1xV--BgNgnEwISIeGDef2l0OThFkYplyg7Uifb8DpFC5P4-RKTiGdoJ/exec';
+const GS_URL = 'https://script.google.com/macros/s/AKfycbyAeh0MlwSlYM247xgrgMR--ZIYXjTPVC96W6or4VXqH21POM9PckUB94Cb48CpMKFq/exec';
 
 const list = document.getElementById('refs-list');
-REFS.forEach((ref, i) => {
-  const row = document.createElement('div');
+REFS.forEach(function(ref, i) {
+  var row = document.createElement('div');
   row.className = 'ref-row';
   row.innerHTML = '<span class="ref-name">' + ref + '</span><input type="number" class="ref-input" id="ref-' + i + '" min="0" placeholder="0" inputmode="numeric">';
   list.appendChild(row);
 });
 
-const now = new Date();
+var now = new Date();
 document.getElementById('fecha').value = now.toISOString().split('T')[0];
 document.getElementById('hora').value = now.toTimeString().slice(0,5);
 
 function captureGPS() {
-  const btn = document.getElementById('gps-btn');
-  const status = document.getElementById('gps-status');
+  var btn = document.getElementById('gps-btn');
+  var status = document.getElementById('gps-status');
   btn.disabled = true;
   status.className = 'gps-status';
   status.textContent = 'Obteniendo ubicación...';
@@ -205,17 +205,34 @@ function enviar() {
   });
   row.push(obs);
 
+  // Intentar con fetch normal primero, luego fallback a no-cors
   fetch(GS_URL, {
     method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ row: row })
-  }).then(function() {
-    showSuccess(vendedor, cliente, punto, refsCount);
-  }).catch(function() {
-    btn.disabled = false;
-    btn.textContent = 'Enviar registro';
-    alert('Error de conexión. Verifica tu internet e intenta de nuevo.');
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (data.result === 'ok') {
+      showSuccess(vendedor, cliente, punto, refsCount);
+    } else {
+      throw new Error(data.message || 'Error desconocido');
+    }
+  })
+  .catch(function() {
+    // Fallback no-cors
+    fetch(GS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ row: row })
+    }).then(function() {
+      showSuccess(vendedor, cliente, punto, refsCount);
+    }).catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Enviar registro';
+      alert('Error de conexión. Verifica tu internet e intenta de nuevo.');
+    });
   });
 }
 
