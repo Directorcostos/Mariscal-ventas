@@ -29,6 +29,10 @@ textarea{resize:vertical;min-height:80px;font-family:inherit;line-height:1.5}
 .gps-address{font-size:12px;color:#1a6ec4;margin-top:4px;text-align:center;font-style:italic;min-height:16px}
 .gps-ok{color:#2d7a2d}
 .gps-err{color:#c0392b}
+.geo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.geo-box{background:#f0f7ff;border:1px solid #c8e0ff;border-radius:8px;padding:8px 10px}
+.geo-box-label{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+.geo-box-value{font-size:13px;color:#1a4a8a;font-weight:500;min-height:18px}
 .submit-btn{width:100%;padding:15px;border:none;border-radius:8px;background:#1a6ec4;color:#fff;font-size:17px;font-weight:600;cursor:pointer;margin-top:.5rem;-webkit-tap-highlight-color:transparent}
 .submit-btn:active{background:#155fa0}
 .submit-btn:disabled{opacity:.5;cursor:not-allowed}
@@ -86,9 +90,21 @@ textarea{resize:vertical;min-height:80px;font-family:inherit;line-height:1.5}
       </button>
       <p class="gps-status" id="gps-status"></p>
       <p class="gps-address" id="gps-address"></p>
+      <div class="geo-grid" id="geo-grid" style="display:none">
+        <div class="geo-box">
+          <div class="geo-box-label">Ciudad</div>
+          <div class="geo-box-value" id="geo-ciudad">—</div>
+        </div>
+        <div class="geo-box">
+          <div class="geo-box-label">Barrio</div>
+          <div class="geo-box-value" id="geo-barrio">—</div>
+        </div>
+      </div>
       <input type="hidden" id="lat">
       <input type="hidden" id="lng">
       <input type="hidden" id="direccion">
+      <input type="hidden" id="ciudad">
+      <input type="hidden" id="barrio">
     </div>
 
     <div class="section">
@@ -152,6 +168,8 @@ function captureGPS() {
   status.className = 'gps-status';
   status.textContent = 'Obteniendo ubicación...';
   addressEl.textContent = '';
+  document.getElementById('geo-grid').style.display = 'none';
+
   if (!navigator.geolocation) {
     status.className = 'gps-status gps-err';
     status.textContent = 'GPS no disponible en este dispositivo';
@@ -168,18 +186,34 @@ function captureGPS() {
       status.textContent = '✓ Lat: ' + lat + ', Lng: ' + lng;
       btn.textContent = '✅ Ubicación capturada';
       btn.disabled = false;
-      // Geocodificación inversa con OpenStreetMap (gratuita, sin API key)
       addressEl.textContent = 'Obteniendo dirección...';
+
       fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&addressdetails=1&accept-language=es')
         .then(function(r) { return r.json(); })
         .then(function(data) {
           var addr = data.display_name || 'Dirección no disponible';
+          var a = data.address || {};
+
+          // Ciudad: intentar varios campos en orden de preferencia
+          var ciudad = a.city || a.town || a.municipality || a.county || a.state_district || a.state || 'No disponible';
+
+          // Barrio: intentar varios campos
+          var barrio = a.neighbourhood || a.suburb || a.quarter || a.residential || a.village || 'No disponible';
+
           document.getElementById('direccion').value = addr;
+          document.getElementById('ciudad').value = ciudad;
+          document.getElementById('barrio').value = barrio;
+
           addressEl.textContent = '📌 ' + addr;
+          document.getElementById('geo-ciudad').textContent = ciudad;
+          document.getElementById('geo-barrio').textContent = barrio;
+          document.getElementById('geo-grid').style.display = 'grid';
         })
         .catch(function() {
           addressEl.textContent = 'Dirección no disponible';
           document.getElementById('direccion').value = 'No disponible';
+          document.getElementById('ciudad').value = 'No disponible';
+          document.getElementById('barrio').value = 'No disponible';
         });
     },
     function() {
@@ -212,6 +246,8 @@ function enviar() {
   var lat = document.getElementById('lat').value;
   var lng = document.getElementById('lng').value;
   var direccion = document.getElementById('direccion').value;
+  var ciudad = document.getElementById('ciudad').value;
+  var barrio = document.getElementById('barrio').value;
   var obs = document.getElementById('observacion').value.trim();
 
   var refsCount = 0;
@@ -226,7 +262,8 @@ function enviar() {
   var row = [
     new Date().toISOString(),
     vendedor, canal, cliente, punto, fecha, hora,
-    lat || 'Sin GPS', lng || 'Sin GPS', direccion || 'Sin dirección'
+    lat || 'Sin GPS', lng || 'Sin GPS',
+    ciudad || 'Sin ciudad', barrio || 'Sin barrio', direccion || 'Sin dirección'
   ];
   REFS.forEach(function(_, i) {
     row.push(document.getElementById('ref-' + i).value || '0');
@@ -239,8 +276,8 @@ function enviar() {
     body: JSON.stringify({ row: row })
   })
   .then(function(res) { return res.json(); })
-  .then(function(data) {
-    showSuccess(vendedor, cliente, punto, refsCount);
+  .then(function() {
+    showSuccess(vendedor, cliente, ciudad, refsCount);
   })
   .catch(function() {
     fetch(GS_URL, {
@@ -249,7 +286,7 @@ function enviar() {
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ row: row })
     }).then(function() {
-      showSuccess(vendedor, cliente, punto, refsCount);
+      showSuccess(vendedor, cliente, ciudad, refsCount);
     }).catch(function() {
       btn.disabled = false;
       btn.textContent = 'Enviar registro';
@@ -258,12 +295,12 @@ function enviar() {
   });
 }
 
-function showSuccess(vendedor, cliente, punto, refs) {
+function showSuccess(vendedor, cliente, ciudad, refs) {
   document.getElementById('form-body').style.display = 'none';
   var msg = document.getElementById('success-msg');
   msg.style.display = 'block';
   document.getElementById('success-detail').textContent =
-    vendedor + ' · ' + cliente + ' · ' + punto + ' · ' + refs + ' referencia' + (refs !== 1 ? 's' : '') + ' con inventario';
+    vendedor + ' · ' + cliente + ' · ' + (ciudad || '') + ' · ' + refs + ' referencia' + (refs !== 1 ? 's' : '') + ' con inventario';
 }
 
 function resetForm() {
@@ -276,11 +313,16 @@ function resetForm() {
   document.getElementById('observacion').value = '';
   document.getElementById('gps-status').textContent = '';
   document.getElementById('gps-address').textContent = '';
+  document.getElementById('geo-grid').style.display = 'none';
+  document.getElementById('geo-ciudad').textContent = '—';
+  document.getElementById('geo-barrio').textContent = '—';
   document.getElementById('gps-btn').textContent = '📍 Capturar ubicación';
   document.getElementById('gps-btn').disabled = false;
   document.getElementById('lat').value = '';
   document.getElementById('lng').value = '';
   document.getElementById('direccion').value = '';
+  document.getElementById('ciudad').value = '';
+  document.getElementById('barrio').value = '';
   REFS.forEach(function(_, i) { document.getElementById('ref-' + i).value = ''; });
   var now = new Date();
   document.getElementById('fecha').value = now.toISOString().split('T')[0];
