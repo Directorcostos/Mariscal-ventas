@@ -26,6 +26,7 @@ textarea{resize:vertical;min-height:80px;font-family:inherit;line-height:1.5}
 .gps-btn{width:100%;padding:11px;border:1px solid #ccc;border-radius:8px;background:#f8f8f8;color:#1a1a1a;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent}
 .gps-btn:active{background:#eee}
 .gps-status{font-size:12px;color:#666;margin-top:6px;min-height:16px;text-align:center}
+.gps-address{font-size:12px;color:#1a6ec4;margin-top:4px;text-align:center;font-style:italic;min-height:16px}
 .gps-ok{color:#2d7a2d}
 .gps-err{color:#c0392b}
 .submit-btn{width:100%;padding:15px;border:none;border-radius:8px;background:#1a6ec4;color:#fff;font-size:17px;font-weight:600;cursor:pointer;margin-top:.5rem;-webkit-tap-highlight-color:transparent}
@@ -55,6 +56,13 @@ textarea{resize:vertical;min-height:80px;font-family:inherit;line-height:1.5}
     </div>
 
     <div class="section">
+      <div class="section-title">Canal</div>
+      <label for="canal">Canal de venta</label>
+      <input type="text" id="canal" placeholder="Ej: TAT, Autoservicio, Institucional">
+      <div class="err" id="err-canal">Ingresa el canal</div>
+    </div>
+
+    <div class="section">
       <div class="section-title">Datos del cliente</div>
       <label for="cliente">Nombre del cliente</label>
       <input type="text" id="cliente" placeholder="Ej: Tienda El Progreso">
@@ -77,8 +85,10 @@ textarea{resize:vertical;min-height:80px;font-family:inherit;line-height:1.5}
         📍 Capturar ubicación
       </button>
       <p class="gps-status" id="gps-status"></p>
+      <p class="gps-address" id="gps-address"></p>
       <input type="hidden" id="lat">
       <input type="hidden" id="lng">
+      <input type="hidden" id="direccion">
     </div>
 
     <div class="section">
@@ -122,7 +132,7 @@ const REFS = [
 
 const GS_URL = 'https://script.google.com/macros/s/AKfycbyAeh0MlwSlYM247xgrgMR--ZIYXjTPVC96W6or4VXqH21POM9PckUB94Cb48CpMKFq/exec';
 
-const list = document.getElementById('refs-list');
+var list = document.getElementById('refs-list');
 REFS.forEach(function(ref, i) {
   var row = document.createElement('div');
   row.className = 'ref-row';
@@ -137,9 +147,11 @@ document.getElementById('hora').value = now.toTimeString().slice(0,5);
 function captureGPS() {
   var btn = document.getElementById('gps-btn');
   var status = document.getElementById('gps-status');
+  var addressEl = document.getElementById('gps-address');
   btn.disabled = true;
   status.className = 'gps-status';
   status.textContent = 'Obteniendo ubicación...';
+  addressEl.textContent = '';
   if (!navigator.geolocation) {
     status.className = 'gps-status gps-err';
     status.textContent = 'GPS no disponible en este dispositivo';
@@ -156,6 +168,19 @@ function captureGPS() {
       status.textContent = '✓ Lat: ' + lat + ', Lng: ' + lng;
       btn.textContent = '✅ Ubicación capturada';
       btn.disabled = false;
+      // Geocodificación inversa con OpenStreetMap (gratuita, sin API key)
+      addressEl.textContent = 'Obteniendo dirección...';
+      fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&addressdetails=1&accept-language=es')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var addr = data.display_name || 'Dirección no disponible';
+          document.getElementById('direccion').value = addr;
+          addressEl.textContent = '📌 ' + addr;
+        })
+        .catch(function() {
+          addressEl.textContent = 'Dirección no disponible';
+          document.getElementById('direccion').value = 'No disponible';
+        });
     },
     function() {
       status.className = 'gps-status gps-err';
@@ -173,9 +198,11 @@ function showErr(id, show) {
 function enviar() {
   var valid = true;
   var vendedor = document.getElementById('vendedor').value.trim();
+  var canal = document.getElementById('canal').value.trim();
   var cliente = document.getElementById('cliente').value.trim();
   var punto = document.getElementById('punto').value.trim();
   if (!vendedor) { showErr('vendedor', true); valid = false; } else showErr('vendedor', false);
+  if (!canal) { showErr('canal', true); valid = false; } else showErr('canal', false);
   if (!cliente) { showErr('cliente', true); valid = false; } else showErr('cliente', false);
   if (!punto) { showErr('punto', true); valid = false; } else showErr('punto', false);
   if (!valid) return;
@@ -184,6 +211,7 @@ function enviar() {
   var hora = document.getElementById('hora').value;
   var lat = document.getElementById('lat').value;
   var lng = document.getElementById('lng').value;
+  var direccion = document.getElementById('direccion').value;
   var obs = document.getElementById('observacion').value.trim();
 
   var refsCount = 0;
@@ -197,15 +225,14 @@ function enviar() {
 
   var row = [
     new Date().toISOString(),
-    vendedor, cliente, punto, fecha, hora,
-    lat || 'Sin GPS', lng || 'Sin GPS'
+    vendedor, canal, cliente, punto, fecha, hora,
+    lat || 'Sin GPS', lng || 'Sin GPS', direccion || 'Sin dirección'
   ];
   REFS.forEach(function(_, i) {
     row.push(document.getElementById('ref-' + i).value || '0');
   });
   row.push(obs);
 
-  // Intentar con fetch normal primero, luego fallback a no-cors
   fetch(GS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
@@ -213,14 +240,9 @@ function enviar() {
   })
   .then(function(res) { return res.json(); })
   .then(function(data) {
-    if (data.result === 'ok') {
-      showSuccess(vendedor, cliente, punto, refsCount);
-    } else {
-      throw new Error(data.message || 'Error desconocido');
-    }
+    showSuccess(vendedor, cliente, punto, refsCount);
   })
   .catch(function() {
-    // Fallback no-cors
     fetch(GS_URL, {
       method: 'POST',
       mode: 'no-cors',
@@ -248,14 +270,17 @@ function resetForm() {
   document.getElementById('form-body').style.display = 'block';
   document.getElementById('success-msg').style.display = 'none';
   document.getElementById('vendedor').value = '';
+  document.getElementById('canal').value = '';
   document.getElementById('cliente').value = '';
   document.getElementById('punto').value = '';
   document.getElementById('observacion').value = '';
   document.getElementById('gps-status').textContent = '';
+  document.getElementById('gps-address').textContent = '';
   document.getElementById('gps-btn').textContent = '📍 Capturar ubicación';
   document.getElementById('gps-btn').disabled = false;
   document.getElementById('lat').value = '';
   document.getElementById('lng').value = '';
+  document.getElementById('direccion').value = '';
   REFS.forEach(function(_, i) { document.getElementById('ref-' + i).value = ''; });
   var now = new Date();
   document.getElementById('fecha').value = now.toISOString().split('T')[0];
