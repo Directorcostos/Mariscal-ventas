@@ -148,6 +148,30 @@ const REFS = [
 
 const GS_URL = 'https://script.google.com/macros/s/AKfycbyAeh0MlwSlYM247xgrgMR--ZIYXjTPVC96W6or4VXqH21POM9PckUB94Cb48CpMKFq/exec';
 
+// --- Identificador de dispositivo ---
+// Se crea una sola vez la primera vez que se abre el formulario en un celular
+// y se queda guardado en ese navegador (localStorage). Todas las visitas
+// enviadas desde ese mismo celular usan el mismo identificador.
+function obtenerIdDispositivo() {
+  var KEY = 'mariscal_device_id';
+  try {
+    var id = localStorage.getItem(KEY);
+    if (!id) {
+      id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : generarIdAlterno();
+      localStorage.setItem(KEY, id);
+    }
+    return id;
+  } catch (e) {
+    // Si el navegador bloquea localStorage (modo incógnito, etc.), se genera
+    // uno temporal solo para este envío.
+    return generarIdAlterno();
+  }
+}
+function generarIdAlterno() {
+  return 'dev-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+var DEVICE_ID = obtenerIdDispositivo();
+
 var list = document.getElementById('refs-list');
 REFS.forEach(function(ref, i) {
   var row = document.createElement('div');
@@ -269,6 +293,7 @@ function enviar() {
     row.push(document.getElementById('ref-' + i).value || '0');
   });
   row.push(obs);
+  row.push(DEVICE_ID);
 
   fetch(GS_URL, {
     method: 'POST',
