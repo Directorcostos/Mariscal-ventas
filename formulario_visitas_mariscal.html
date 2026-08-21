@@ -172,6 +172,18 @@ function generarIdAlterno() {
 }
 var DEVICE_ID = obtenerIdDispositivo();
 
+// Calcula la fecha y hora Colombia (UTC-5) a partir del Timestamp UTC, sin depender
+// de cómo tenga configurada la zona horaria el celular del vendedor.
+function partesColombia(fechaUTC) {
+  var COLOMBIA_OFFSET_MS = 5 * 60 * 60 * 1000;
+  var local = new Date(fechaUTC.getTime() - COLOMBIA_OFFSET_MS);
+  var pad = function (n) { return n < 10 ? '0' + n : String(n); };
+  return {
+    fecha: local.getUTCFullYear() + '-' + pad(local.getUTCMonth() + 1) + '-' + pad(local.getUTCDate()),
+    hora: pad(local.getUTCHours()) + ':' + pad(local.getUTCMinutes()) + ':' + pad(local.getUTCSeconds())
+  };
+}
+
 var list = document.getElementById('refs-list');
 REFS.forEach(function(ref, i) {
   var row = document.createElement('div');
@@ -283,8 +295,12 @@ function enviar() {
   btn.disabled = true;
   btn.textContent = 'Enviando...';
 
+  var ahoraUTC = new Date();
+  var col = partesColombia(ahoraUTC);
   var row = [
-    new Date().toISOString(),
+    ahoraUTC.toISOString(),
+    col.fecha,
+    col.hora,
     vendedor, canal, cliente, punto, fecha, hora,
     lat || 'Sin GPS', lng || 'Sin GPS',
     ciudad || 'Sin ciudad', barrio || 'Sin barrio', direccion || 'Sin dirección'
